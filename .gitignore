@@ -2,3 +2,6 @@
 *.pyc
 env
 .vscode
+.mypy_cache
+.ipynb_checkpoints
+rl_tensorboard_logs/
