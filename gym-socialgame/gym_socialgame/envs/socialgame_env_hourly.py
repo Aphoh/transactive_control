@@ -8,11 +8,19 @@ from gym_socialgame.envs.utils import price_signal
 from gym_socialgame.envs.agents import *
 from gym_socialgame.envs.reward import Reward
 
-class SocialGameEnvHourly(SocialGameEnv):
-    metadata = {'render.modes': ['human']}
 
-    def __init__(self, action_space_string = "continuous", response_type_string = "l", number_of_participants = 10,
-                one_price = 0, energy_in_state = True, yesterday_in_state = False):
+class SocialGameEnvHourly(SocialGameEnv):
+    metadata = {"render.modes": ["human"]}
+
+    def __init__(
+        self,
+        action_space_string="continuous",
+        response_type_string="l",
+        number_of_participants=10,
+        one_price=0,
+        energy_in_state=True,
+        yesterday_in_state=False,
+    ):
         """
         SocialGameEnv for an agent determining incentives in a social game. 
         
@@ -29,19 +37,20 @@ class SocialGameEnvHourly(SocialGameEnv):
             yesterday_in_state: (Boolean) denoting whether (or not) to append yesterday's price signal to the state
 
         """
-        super().__init__(action_space_string=action_space_string,
-                        response_type_string=response_type_string,
-                        number_of_participants=number_of_participants,
-                        one_price=one_price,
-                        energy_in_state=energy_in_state,
-                        yesterday_in_state=yesterday_in_state)
+        super().__init__(
+            action_space_string=action_space_string,
+            response_type_string=response_type_string,
+            number_of_participants=number_of_participants,
+            one_price=one_price,
+            energy_in_state=energy_in_state,
+            yesterday_in_state=yesterday_in_state,
+        )
 
-        #TODO: Check initialization of prev_energy
+        # TODO: Check initialization of prev_energy
         self.prev_energy = np.zeros(1)
 
-
         print("\n Social Game Hourly Environment Initialized! Have Fun! \n")
-    
+
     def _create_observation_space(self):
         """
         Purpose: Returns the observation space
@@ -53,19 +62,26 @@ class SocialGameEnvHourly(SocialGameEnv):
             Space based on yesterday_in_state, and energy_in_state obj param
         """
 
-        if(self.yesterday_in_state):
-            if(self.energy_in_state):
-                return spaces.Box(low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32)
+        if self.yesterday_in_state:
+            if self.energy_in_state:
+                return spaces.Box(
+                    low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32
+                )
             else:
-                return spaces.Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32)
+                return spaces.Box(
+                    low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32
+                )
 
         else:
             if self.energy_in_state:
-                return spaces.Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32)
+                return spaces.Box(
+                    low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32
+                )
             else:
-                return spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32)
+                return spaces.Box(
+                    low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32
+                )
 
-    
     def _create_action_space(self):
         """
         Purpose: Return action space of type specified by self.action_space_string
@@ -79,12 +95,13 @@ class SocialGameEnvHourly(SocialGameEnv):
         Note: Discrete refers to a values [0,10] 
         """
 
-        #TODO: Create {Low, Med, High} Actions
+        # TODO: Create {Low, Med, High} Actions
 
-
-        #Making a symmetric, continuous space to help learning for continuous control (suggested in StableBaselines doc.)
+        # Making a symmetric, continuous space to help learning for continuous control (suggested in StableBaselines doc.)
         if self.action_space_string == "continuous":
-            return spaces.Box(low=-1, high=1, shape=(self.action_length,), dtype=np.float32)
+            return spaces.Box(
+                low=-1, high=1, shape=(self.action_length,), dtype=np.float32
+            )
 
         elif self.action_space_string == "discrete":
             return spaces.Discrete(10)
@@ -99,25 +116,27 @@ class SocialGameEnvHourly(SocialGameEnv):
         Returns: Points: 10-dim vector of incentives for game (same incentive for each player)
         """
         if self.action_space_string == "discrete":
-            #Mapping 0 -> 0.0, 1 -> 5.0, 2 -> 10.0
+            # Mapping 0 -> 0.0, 1 -> 5.0, 2 -> 10.0
             points = action
 
-        elif self.action_space_string == 'continuous':
-            #Continuous space is symmetric [-1,1], we map to -> [0,10] by adding 1 and multiplying by 5
+        elif self.action_space_string == "continuous":
+            # Continuous space is symmetric [-1,1], we map to -> [0,10] by adding 1 and multiplying by 5
             points = 5 * (action + np.ones_like(action))
-        
+
         return points
 
     def _get_observation(self):
-        """ Returns observation for current hour """ 
-        
-        #Observations are per hour now
+        """ Returns observation for current hour """
+
+        # Observations are per hour now
         prev_price = np.array([self.prices[self.day][(self.hour - 1) % 10]])
         next_observation = np.array([self.prices[self.day][self.hour]])
 
-        if(self.yesterday_in_state):
+        if self.yesterday_in_state:
             if self.energy_in_state:
-                return np.concatenate((next_observation, np.concatenate((prev_price, self.prev_energy))))
+                return np.concatenate(
+                    (next_observation, np.concatenate((prev_price, self.prev_energy)))
+                )
             else:
                 return np.concatenate((next_observation, prev_price))
 
@@ -126,7 +145,6 @@ class SocialGameEnvHourly(SocialGameEnv):
 
         else:
             return next_observation
-
 
     def step(self, action):
         """
@@ -142,64 +160,63 @@ class SocialGameEnvHourly(SocialGameEnv):
             Info: Other info (primarily for gym env based library compatibility)
 
         """
-        #Checking that action is valid; If not, we clip (OpenAI algos don't take into account action space limits so we must do it ourselves)
-        if(not self.action_space.contains(action)):
+        # Checking that action is valid; If not, we clip (OpenAI algos don't take into account action space limits so we must do it ourselves)
+        if not self.action_space.contains(action):
             action = np.asarray(action)
-            if(self.action_space_string == 'continuous'):
+            if self.action_space_string == "continuous":
                 action = np.clip(action, 0, 10)
 
-            elif(self.action_space_string == 'multidiscrete'):
-                action = np.clip(action, 0, 2) 
+            elif self.action_space_string == "multidiscrete":
+                action = np.clip(action, 0, 2)
 
         prev_price = self.prices[self.day]
 
         points = self._points_from_action(action)
 
-        #TODO: FIX ENERGY CONSUMPTION (Player consumption must be vectorized!)
+        # TODO: FIX ENERGY CONSUMPTION (Player consumption must be vectorized!)
         energy_consumptions = self._simulate_humans(points)
-        
+
         # HACK ALERT. USING AVG ENERGY CONSUMPTION FOR STATE SPACE. this will not work if people are not all the same
         self.prev_energy = energy_consumptions["avg"]
-        
-        #Getting reward
+
+        # Getting reward
         self.reward += self._get_reward(prev_price, energy_consumptions)
 
-        #Advancing hour
+        # Advancing hour
         self.hour += 1
 
-        #Getting next observation
+        # Getting next observation
         observation = self._get_observation()
 
-        #Setting done and return reward
+        # Setting done and return reward
         if self.hour == 10:
-            #Reset hour
+            # Reset hour
             self.hour = 0
 
-            #Advance one day
+            # Advance one day
             self.day = (self.day + 1) % 365
 
-            #Finish episode
+            # Finish episode
             done = True
             reward = self.reward
 
         else:
             done = False
             reward = 0.0
-        
-        #Setting info for baselines compatibility (no relevant info for us)
+
+        # Setting info for baselines compatibility (no relevant info for us)
         info = {}
 
         return observation, reward, done, info
 
-
-    #Keeping reset, render, close for clarity sake
+    # Keeping reset, render, close for clarity sake
     def reset(self):
-        """ Resets the environment on the current day """ 
-        #Currently resetting based on current day to work with StableBaselines
+        """ Resets the environment on the current day """
+        # Currently resetting based on current day to work with StableBaselines
 
         return self._get_observation()
 
-    def render(self, mode='human'):
+    def render(self, mode="human"):
         pass
 
     def close(self):
