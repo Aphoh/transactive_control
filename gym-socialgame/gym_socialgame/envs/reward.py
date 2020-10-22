@@ -168,4 +168,6 @@ class Reward:
             print("Problem with reward")
             print("Taking the neg abs value so that it stays the same sign.")
 
-        return -np.abs(cost_difference / ideal_cost)
+        reward = -np.abs(cost_difference/ideal_cost)
+
+        return reward
