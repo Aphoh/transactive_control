@@ -73,7 +73,7 @@ def eval_policy(model, args, num_eval_episodes: int, list_reward_per_episode=Fal
         Args: Args (so we can instantiate eval env here)
         num_eval_episodes: (Int) number of episodes to evaluate policy
         list_reward_per_episode: (Boolean) Whether or not to return a list containing rewards per episode (instead of mean reward over all episodes)
-    
+
     """
     # Since evaluate_policy goes over the first num_eval_episodes, if we train on one_yr we will always evaluate against the same n days
     if args.one_price == 0:
@@ -194,7 +194,7 @@ def get_environment(args, eval=False, response=None):
 
     Args:
         args
-        eval: Boolean denoting whether or not to return evaluation env 
+        eval: Boolean denoting whether or not to return evaluation env
         response: For setting response for eval env^
 
     Returns: Environment with action space compatible with algo
@@ -207,7 +207,10 @@ def get_environment(args, eval=False, response=None):
 
     # SAC only works in continuous environment
     if args.algo == "sac":
-        action_space_string = "continuous"
+        if args.action_space == "fourier":
+            action_space_string = "fourier"
+        else:
+            action_space_string = "continuous"
 
     # For algos (e.g. ppo) which can handle discrete or continuous case
 
@@ -264,6 +267,7 @@ def get_environment(args, eval=False, response=None):
             number_of_participants=args.num_players,
             yesterday_in_state=args.yesterday,
             energy_in_state=args.energy,
+            fourier_basis_size=args.fourier_basis_size
         )
 
     else:
@@ -277,6 +281,7 @@ def get_environment(args, eval=False, response=None):
                 number_of_participants=args.num_players,
                 yesterday_in_state=args.yesterday,
                 energy_in_state=args.energy,
+                fourier_basis_size=args.fourier_basis_size,
                 low=args.low,
                 high=args.high,
                 distr=args.distr,
@@ -291,6 +296,7 @@ def get_environment(args, eval=False, response=None):
                 number_of_participants=args.num_players,
                 yesterday_in_state=args.yesterday,
                 energy_in_state=args.energy,
+                fourier_basis_size=args.fourier_basis_size
             )
 
     # Check to make sure any new changes to environment follow OpenAI Gym API
@@ -359,7 +365,14 @@ def parse_args():
         "--action_space",
         help="Action Space for Algo (only used for algos that are compatable with both discrete & cont",
         default="c",
-        choices=["c", "d"],
+        choices=["c", "d", "fourier"],
+    )
+    parser.add_argument(
+        "--fourier_basis_size",
+        help="Fourier basis size to use when using fourier action space",
+        type=int,
+        default=4,
+        choices=list(range(100))
     )
     parser.add_argument(
         "--response",

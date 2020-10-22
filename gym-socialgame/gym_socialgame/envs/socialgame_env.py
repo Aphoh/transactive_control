@@ -21,22 +21,24 @@ class SocialGameEnv(gym.Env):
         energy_in_state=False,
         yesterday_in_state=False,
         pricing_type="TOU",
+        fourier_basis_size=4
     ):
         """
-        SocialGameEnv for an agent determining incentives in a social game. 
-        
-        Note: One-step trajectory (i.e. agent submits a 10-dim vector containing incentives for each hour (8AM - 5PM) each day. 
+        SocialGameEnv for an agent determining incentives in a social game.
+
+        Note: One-step trajectory (i.e. agent submits a 10-dim vector containing incentives for each hour (8AM - 5PM) each day.
             Then, environment advances one-day and agent is told that the episode has finished.)
 
         Args:
-            action_space_string: (String) either "continuous", or "multidiscrete"
+            action_space_string: (String) either "continuous", "multidiscrete", or "fourier"
             response_type_string: (String) either "t", "s", "l" , denoting whether the office's response function is threshold, sinusoidal, or linear
             number_of_participants: (Int) denoting the number of players in the social game (must be > 0 and < 20)
-            one_price: (Int) in range [-1,365] denoting which fixed day to train on . 
+            one_price: (Int) in range [-1,365] denoting which fixed day to train on .
                     Note: -1 = Random Day, 0 = Train over entire Yr, [1,365] = Day of the Year
             energy_in_state: (Boolean) denoting whether (or not) to include the previous day's energy consumption within the state
             yesterday_in_state: (Boolean) denoting whether (or not) to append yesterday's price signal to the state
             pricing_type = (Str) Method for calculating pricing #TODO: Update this description <-
+            fourier_basis_size (int) = number of fourier components to use. 4 will have 7 terms (8 - 1 zero sin(2 pi 0 x) term)
 
         """
         super(SocialGameEnv, self).__init__()
@@ -50,6 +52,7 @@ class SocialGameEnv(gym.Env):
             energy_in_state,
             yesterday_in_state,
             pricing_type,
+            fourier_basis_size
         )
 
         # Assigning Instance Variables
@@ -59,6 +62,7 @@ class SocialGameEnv(gym.Env):
         self.one_price = self._find_one_price(one_price)
         self.energy_in_state = energy_in_state
         self.yesterday_in_state = yesterday_in_state
+        self.fourier_basis_size = fourier_basis_size
 
         # Create Observation Space (aka State Space)
         self.observation_space = self._create_observation_space()
@@ -75,7 +79,7 @@ class SocialGameEnv(gym.Env):
         self.cur_iter = 0
 
         # Create Action Space
-        self.action_length = 10
+        self.points_length = 10
         self.action_subspace = 3
         self.action_space = self._create_action_space()
 
@@ -114,7 +118,7 @@ class SocialGameEnv(gym.Env):
             None
 
         Returns:
-            Observation Space for environment based on action_space_str 
+            Observation Space for environment based on action_space_str
         """
 
         if self.yesterday_in_state:
@@ -143,23 +147,29 @@ class SocialGameEnv(gym.Env):
 
         Args:
             None
-        
+
         Returns:
-            Action Space for environment based on action_space_str 
-        
+            Action Space for environment based on action_space_str
+
         Note: Multidiscrete refers to a 10-dim vector where each action {0,1,2} represents Low, Medium, High points respectively.
-        We pose this option to test whether simplifying the action-space helps the agent. 
+        We pose this option to test whether simplifying the action-space helps the agent.
         """
 
         # Making a symmetric, continuous space to help learning for continuous control (suggested in StableBaselines doc.)
         if self.action_space_string == "continuous":
             return spaces.Box(
-                low=-1, high=1, shape=(self.action_length,), dtype=np.float32
+                low=-1, high=1, shape=(self.points_length,), dtype=np.float32
             )
 
         elif self.action_space_string == "multidiscrete":
-            discrete_space = [self.action_subspace] * self.action_length
+            discrete_space = [self.action_subspace] * self.points_length
             return spaces.MultiDiscrete(discrete_space)
+
+        elif self.action_space_string == "fourier":
+            return spaces.Box(
+                low=-np.inf, high=np.inf, shape=(2*self.fourier_basis_size - 1,), dtype=np.float32
+            )
+
 
     def _create_agents(self):
         """
@@ -227,7 +237,7 @@ class SocialGameEnv(gym.Env):
 
         Args:
             None
-            
+
         Returns: Array containing 365 price signals, where array[day_number] = grid_price for day_number from 8AM - 5PM
 
         """
@@ -263,7 +273,9 @@ class SocialGameEnv(gym.Env):
 
         Args:
             Action: 10-dim vector corresponding to action for each hour 8AM - 5PM
-        
+            or a 2*fourier_basis_size - 1 length vector corresponding to fourier basis weights
+            if action_space_string == "fourier"
+
         Returns: Points: 10-dim vector of incentives for game (same incentive for each player)
         """
         if self.action_space_string == "multidiscrete":
@@ -272,6 +284,17 @@ class SocialGameEnv(gym.Env):
         elif self.action_space_string == "continuous":
             # Continuous space is symmetric [-1,1], we map to -> [0,10] by adding 1 and multiplying by 5
             points = 5 * (action + np.ones_like(action))
+        elif self.action_space_string == "fourier":
+            print("action input: {}".format(action))
+            root_points = (action[0]/2)*np.ones(self.points_length)
+            inp = np.linspace(0, 1, self.points_length)
+            for k in range(1,self.fourier_basis_size):
+                ak, bk = action[2*k - 1], action[2*k]
+                root_points += ak * np.sin(2*np.pi*k*inp) + bk * np.cos(2*np.pi*k*inp)
+
+            points = root_points**2
+            points = np.clip(points, 0, 10)
+            print("fourier points output: {}".format(points))
 
         return points
 
@@ -281,8 +304,8 @@ class SocialGameEnv(gym.Env):
 
         Args:
             Action: 10-dim vector corresponding to action for each hour 8AM - 5PM
-        
-        Returns: 
+
+        Returns:
             Energy_consumption: Dictionary containing the energy usage by player and the average energy used in the office (key = "avg")
         """
 
@@ -309,8 +332,8 @@ class SocialGameEnv(gym.Env):
         Args:
             Price: Price signal vector (10-dim)
             Energy_consumption: Dictionary containing energy usage by player in the office and the average office energy usage
-        
-        Returns: 
+
+        Returns:
             Energy_consumption: Dictionary containing the energy usage by player and the average energy used in the office (key = "avg")
         """
 
@@ -338,17 +361,17 @@ class SocialGameEnv(gym.Env):
 
     def step(self, action):
         """
-        Purpose: Takes a step in the environment 
+        Purpose: Takes a step in the environment
 
         Args:
             Action: 10-dim vector detailing player incentive for each hour (8AM - 5PM)
-        
-        Returns: 
+
+        Returns:
             Observation: State for the next day
             Reward: Reward for said action
             Done: Whether or not the day is done (should always be True b/c of 1-step trajectory)
             Info: Other info (primarily for gym env based library compatibility)
-        
+
         Exceptions:
             raises AssertionError if action is not in the action space
         """
@@ -360,6 +383,9 @@ class SocialGameEnv(gym.Env):
 
             elif self.action_space_string == "multidiscrete":
                 action = np.clip(action, 0, 2)
+
+            elif self.action_space_string == "fourier":
+                assert False, "This should never happen, action: {}".format(action)
 
         prev_price = self.prices[(self.day)]
 
@@ -421,10 +447,11 @@ class SocialGameEnv(gym.Env):
         energy_in_state,
         yesterday_in_state,
         pricing_type,
+        fourier_basis_size,
     ):
 
         """
-        Purpose: Verify that all initialization variables are valid 
+        Purpose: Verify that all initialization variables are valid
 
         Args (from initialization):
             action_space_string: String either "continuous" or "discrete" ; Denotes the type of action space
@@ -435,7 +462,7 @@ class SocialGameEnv(gym.Env):
             yesterday_in_state: Boolean denoting whether (or not) to append yesterday's price signal to the state
             pricing_type: String denoting price calculation method
 
-        Exceptions: 
+        Exceptions:
             Raises AssertionError if action_space_string is not a String or if it is not either "continuous", or "multidiscrete"
             Raises AssertionError if response_type_string is not a String or it is is not either "t","s","l"
             Raises AssertionError if number_of_participants is not an integer, is less than 1,  or greater than 20 (upper bound set arbitrarily for comp. purposes).
@@ -453,6 +480,7 @@ class SocialGameEnv(gym.Env):
         assert action_space_string in [
             "continuous",
             "multidiscrete",
+            "fourier",
         ], "action_space_str is not continuous or discrete. Instead got value {}".format(
             action_space_string
         )
@@ -527,3 +555,12 @@ class SocialGameEnv(gym.Env):
         ], "Variable pricing_type is not RTP or TOU. Instead got {}".format(
             pricing_type.upper()
         )
+
+        assert isinstance(
+            fourier_basis_size, int
+        ), "Variable fourier_basis_size is not of type int. Instead got type {}".format(
+            type(fourier_basis_size)
+        )
+        assert fourier_basis_size > 0, "Variable fourier_basis_size must be positive. Got {}".format(
+                fourier_basis_size
+            )

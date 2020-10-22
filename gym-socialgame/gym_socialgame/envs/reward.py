@@ -11,9 +11,9 @@ from sklearn.preprocessing import MinMaxScaler
 class Reward:
     def __init__(self, energy_use, prices, min_demand, max_demand):
         """
-		Args: 
-			energy_use: list returned by Person class signifying energy use 
-			prices: list returned by grid signifying cost throughout day 
+		Args:
+			energy_use: list returned by Person class signifying energy use
+			prices: list returned by grid signifying cost throughout day
 			min_demand: value computed by Person class signifying minimum energy use long term
 			max_demand: value computed by Person class signifying maximum energy use long term
 		"""
@@ -35,9 +35,9 @@ class Reward:
 
     def ideal_use_calculation(self):
         """
-		Computes an optimization of demand according to price 
+		Computes an optimization of demand according to price
 
-		returns: np.array of ideal energy demands given a price signal 
+		returns: np.array of ideal energy demands given a price signal
 		"""
 
         demands = cvx.Variable(self._num_timesteps)
@@ -75,8 +75,8 @@ class Reward:
 
     def log_cost(self):
         """
-		Scales energy_use to be between min and max energy demands (this is repeated 
-		in agent.routine_output_trasform), and then returns the simple total cost. 
+		Scales energy_use to be between min and max energy demands (this is repeated
+		in agent.routine_output_trasform), and then returns the simple total cost.
 
 		"""
 
@@ -87,10 +87,10 @@ class Reward:
 
     def log_cost_regularized(self, h=15):
         """
-		Scales energy_use to be between min and max energy demands (this is repeated 
-		in agent.routine_output_trasform), and then returns the simple total cost. 
+		Scales energy_use to be between min and max energy demands (this is repeated
+		in agent.routine_output_trasform), and then returns the simple total cost.
 
-		:param: h - the hyperparameter that modifies the penalty on energy demand that's driven too low. 
+		:param: h - the hyperparameter that modifies the penalty on energy demand that's driven too low.
 
 		"""
 
@@ -103,10 +103,10 @@ class Reward:
 
     def neg_distance_from_ideal(self, demands):
         """
-		args: 
+		args:
 			demands: np.array() of demands from ideal_use_calculation()
 
-		returns: 
+		returns:
 			a numerical distance metric, negated
 		"""
 
@@ -114,10 +114,10 @@ class Reward:
 
     def cost_distance(self, ideal_demands):
         """
-		args: 
+		args:
 			demands: np.array() of demands from ideal_use_calculation()
 
-		returns: 
+		returns:
 			a cost-based distance metric, negated
 		"""
         current_cost = np.dot(self.prices, self.energy_use)
@@ -129,10 +129,10 @@ class Reward:
 
     def log_cost_distance(self, ideal_demands):
         """
-		args: 
+		args:
 			demands: np.array() of demands from ideal_use_calculation()
 
-		returns: 
+		returns:
 			the log of the cost distance
 		"""
         current_cost = np.dot(self.prices, self.energy_use)
@@ -151,10 +151,10 @@ class Reward:
 
     def scaled_cost_distance(self, ideal_demands):
         """
-		args: 
+		args:
 			demands: np.array() of demands from ideal_use_calculation()
 
-		returns: 
+		returns:
 			a cost-based distance metric normalized by total ideal cost
 		"""
 
