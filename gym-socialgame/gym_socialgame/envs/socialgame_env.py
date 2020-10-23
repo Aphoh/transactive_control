@@ -167,7 +167,7 @@ class SocialGameEnv(gym.Env):
 
         elif self.action_space_string == "fourier":
             return spaces.Box(
-                low=-np.inf, high=np.inf, shape=(2*self.fourier_basis_size - 1,), dtype=np.float32
+                low=-2, high=2, shape=(2*self.fourier_basis_size - 1,), dtype=np.float32
             )
 
 
@@ -351,9 +351,9 @@ class SocialGameEnv(gym.Env):
                     player_energy, price, player_min_demand, player_max_demand
                 )
 
-                player_ideal_demands = player_reward.ideal_use_calculation()
+                #player_ideal_demands = player_reward.ideal_use_calculation()
 
-                reward = player_reward.scaled_cost_distance(player_ideal_demands)
+                reward = player_reward.log_cost_regularized()
 
                 total_reward += reward
 
